@@ -7,9 +7,12 @@ import java.util.*;
 public class LoadData {
     // return values
     private final ArrayList<ArrayList<Double>> td_clean = new ArrayList<>();
+    private final ArrayList<ArrayList<Double>> td_raw = new ArrayList<>();
     private final ArrayList<ArrayList<Double>> md = new ArrayList<>();
     private final ArrayList<ArrayList<Double>> md_complete = new ArrayList<>();
     private final ArrayList<Long> td_time = new ArrayList<>();
+
+    private final ArrayList<String> td_time_str = new ArrayList<>();
 
     // parameter
     private final int td_len;
@@ -20,6 +23,7 @@ public class LoadData {
 
     // array
     private double[][] td_clean_array;
+    private double[][] td_raw_array;
     private double[][] md_array;
     private double[][] md_array_complete;
     private long[] td_time_array;
@@ -53,14 +57,14 @@ public class LoadData {
 
         // add value
         while (sc.hasNextLine()) {
-            String[] line_str = (sc.nextLine() + "0").split(",");
+            String[] line_str = (sc.nextLine()).split(",");
             addValues(this.md_complete, line_str);
         }
         fillNullValue(this.md_complete);  // should not contain null
 
         this.md_array_complete = getDoubleArray(md_complete);
         calMeanStd(md_array_complete);
-        standardization(md_array_complete);
+//        standardization(md_array_complete);
     }
 
     private void loadMasterData(String filename) throws Exception {  // 全随机采样master
@@ -90,7 +94,7 @@ public class LoadData {
 
         // add value
         for (int k = 0; sc.hasNextLine(); k++) {
-            String[] line_str = (sc.nextLine() + "0").split(",");
+            String[] line_str = (sc.nextLine()).split(",");
             if (rev == hs.contains(k))  // sampling
                 continue;
             addValues(this.md, line_str);
@@ -98,7 +102,7 @@ public class LoadData {
         fillNullValue(this.md);  // should not contain null
 
         this.md_array = getDoubleArray(md);
-        standardization(md_array);
+//        standardization(md_array);
     }
 
     private void loadTimeSeriesData(String filename) throws Exception {
@@ -107,28 +111,49 @@ public class LoadData {
         sc.useDelimiter("\\s*([,\\r\\n])\\s*"); // set separator
         sc.nextLine();  // skip table header
         for (int k = td_len; k > 0 && sc.hasNextLine(); --k) {  // the size of td_clean is dataLen
-            String[] line_str = (sc.nextLine() + "0").split(",");
+            String new_line = sc.nextLine();
+
+            if (new_line.charAt(new_line.length()-1) == ',') {
+                new_line = new_line + '0';
+            }
+            String[] line_str = (new_line).split(",");
             // td_time
             this.td_time.add(format.parse(line_str[0]).getTime());
+            this.td_time_str.add(line_str[0]);
+//            System.out.println(Arrays.toString(line_str));
             // td_clean
             addValues(this.td_clean, line_str);
+            // td_raw
+            addValues(this.td_raw, line_str);
         }
+//        System.out.println(this.td_clean.get(0));
         fillNullValue(this.td_clean);
+        fillNullValue(this.td_raw);
 
         this.td_clean_array = getDoubleArray(td_clean);
+        this.td_raw_array = getDoubleArray(td_raw);
         this.td_time_array = getLongArray(td_time);
 
-        standardization(td_clean_array);
+//        standardization(td_clean_array);
+//        standardization(td_raw_array);
 
-        double[] td_row;
-        double dist;
-        for (double[] td_clean_tuple : td_clean_array) {
-            dist = kdTreeComplete.nearestNeighborDistance(td_clean_tuple);
-            if (dist > eta) {
-                td_row = kdTreeComplete.nearestNeighbor(td_clean_tuple);
-                System.arraycopy(td_row, 0, td_clean_tuple, 0, td_clean_tuple.length);
-            }
-        }
+//        double[] td_row;
+//        double dist;
+//        for (double[] td_clean_tuple : td_clean_array) {
+//            dist = kdTreeComplete.nearestNeighborDistance(td_clean_tuple);
+//            if (dist > eta) {
+//                td_row = kdTreeComplete.nearestNeighbor(td_clean_tuple);
+//                System.arraycopy(td_row, 0, td_clean_tuple, 0, td_clean_tuple.length);
+//            }
+//        }
+    }
+
+    public String[] getTd_time_str() {
+        return getStringArray(td_time_str);
+    }
+
+    public double[][] getTd_raw_array() {
+        return td_raw_array;
     }
 
     public long[] getTd_time() {
@@ -205,6 +230,8 @@ public class LoadData {
         for (int col = 0; col < values.get(0).size(); col++) {
             value = values.get(0).get(col);
             for (ArrayList<Double> rowArray : values) {
+//                System.out.println(rowArray.toString());
+//                System.out.println(col);
                 if (Double.isNaN(rowArray.get(col))) {
                     rowArray.set(col, value);
                 } else {
@@ -216,6 +243,14 @@ public class LoadData {
 
     private long[] getLongArray(ArrayList<Long> arrayList) {
         long[] rtn = new long[arrayList.size()];
+        for (int i = 0; i < arrayList.size(); ++i)
+            rtn[i] = arrayList.get(i);
+        return rtn;
+    }
+
+
+    private String[] getStringArray(ArrayList<String> arrayList) {
+        String[] rtn = new String[arrayList.size()];
         for (int i = 0; i < arrayList.size(); ++i)
             rtn[i] = arrayList.get(i);
         return rtn;

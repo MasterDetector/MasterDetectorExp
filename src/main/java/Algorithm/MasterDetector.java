@@ -19,6 +19,7 @@ public class MasterDetector {
     private final int p;
     private double[] std;
     private int[] initial_window;
+    private double regression_loss;
 
     private VARUtil prediction_model;
 
@@ -37,20 +38,31 @@ public class MasterDetector {
         this.eta = eta;
         this.n = td.length;
         long startTime = System.currentTimeMillis();
+//        this.testModelOnly(0.8);
         this.repair();
         long endTime = System.currentTimeMillis();
         this.cost_time = endTime - startTime;
         System.out.println("MasterRepair time cost:" + cost_time + "ms");
     }
 
+    //    public double delta(double[] t_tuple, double[] m_tuple) {
+//        double distance = 0d;
+//        for (int pos = 0; pos < columnCnt; pos++) {
+//            double temp = t_tuple[pos] - m_tuple[pos];
+//            temp = temp / std[pos];
+//            distance += temp * temp;
+//        }
+//        distance = Math.sqrt(distance);
+//        return distance;
+//    }
     public double delta(double[] t_tuple, double[] m_tuple) {
         double distance = 0d;
         for (int pos = 0; pos < columnCnt; pos++) {
             double temp = t_tuple[pos] - m_tuple[pos];
             temp = temp / std[pos];
-            distance += temp * temp;
+            distance += temp;
         }
-        distance = Math.sqrt(distance);
+//        distance = Math.sqrt(distance);
         return distance;
     }
 
@@ -95,6 +107,9 @@ public class MasterDetector {
     public boolean checkConsistency(double[] tuple) {
         double[] NN = kdTreeUtil.nearestNeighbor(tuple);
         double delta = delta(tuple, NN);
+//        System.out.println(Arrays.toString(tuple) + Arrays.toString(NN));
+//
+//        System.out.println(delta);
         if (delta > eta) {
             return false;
         } else return true;
@@ -171,39 +186,6 @@ public class MasterDetector {
         return W;
     }
 
-    //    //  public double[] findTheOptimalForwardRepair(
-//    //      double[][] candidates, int i) {
-//    //    double[][] W_repaired = getWindow(this.td_repaired, i, p);
-//    //    double[] x_repaired_predicted = prediction_model.predict(W_repaired);
-//    //    double[] optimal_repair = new ArrayList<>();
-//    //    double min_dis = Double.MAX_VALUE;
-//    //    for (double[] candidate : candidates) {
-//    //      if (delta(x_repaired_predicted, candidate) < min_dis) {
-//    //        min_dis = delta(x_repaired_predicted, candidate);
-//    //        optimal_repair = candidate;
-//    //      }
-//    //    }
-//    //    return optimal_repair;
-//    //  }
-//
-//    //  public double[] findTheOptimalBackwardRepair(
-//    //      double[][] candidates, int i) {
-//    //    double[][] W_repaired = getWindow(this.td_repaired, i, p);
-//    //    double[] x_repaired = this.td_repaired.get(i);
-//    //    double[] optimal_repair = new ArrayList<>();
-//    //    double min_dis = Double.MAX_VALUE;
-//    //    for (double[] candidate : candidates) {
-//    //      W_repaired.set(0, candidate);
-//    //      double[] x_repaired_predicted = prediction_model.predict(W_repaired);
-//    //
-//    //      if (delta(x_repaired_predicted, x_repaired) < min_dis) {
-//    //        min_dis = delta(x_repaired_predicted, x_repaired);
-//    //        optimal_repair = candidate;
-//    //      }
-//    //    }
-//    //    return optimal_repair;
-//    //  }
-//
     public void forwardRepairing(int p) {
         int i = initial_window[1] + 1;
 
@@ -225,6 +207,7 @@ public class MasterDetector {
                     }
                 }
                 this.td_repaired[i] = optimal_repair;
+                regression_loss += delta(optimal_repair, x_repaired_predicted);
             } else {
 //                this.td_prediction[i] = td[i];
                 this.td_repaired[i] = td[i];
@@ -255,18 +238,21 @@ public class MasterDetector {
                 double[] x_repaired = this.td_repaired[i];
 //        find the optimal repair
                 double min_dis = Double.MAX_VALUE;
+                double regression_loss_delta = 0.0;
                 for (double[] candidate : candidates) {
                     W_repaired[0] = candidate;
                     double[] x_repaired_predicted = arrayToList(prediction_model.predict(W_repaired));
 
                     if (delta(x_repaired_predicted, x_repaired) < min_dis) {
                         min_dis = delta(x_repaired_predicted, x_repaired);
+                        regression_loss_delta = min_dis;
 //                        optimal_prediction_repair = x_repaired_predicted;
                         optimal_repair = candidate;
                     }
                 }
                 this.td_repaired[i] = optimal_repair;
-//                this.td_prediction[i] = optimal_prediction_repair;
+                this.regression_loss += regression_loss_delta;
+//                this.td_prediction[i] = ;
             } else {
 //                optimal_repair = td[i];
 //                this.td_prediction[i] = optimal_repair;
@@ -283,6 +269,7 @@ public class MasterDetector {
     }
 
     public void initList() {
+        this.regression_loss = 0.0;
 //        td_prediction = new double[n][columnCnt];
         td_repaired = new double[n][columnCnt];
 //        anomalies_in_repaired = new boolean[n];
@@ -296,6 +283,54 @@ public class MasterDetector {
         System.arraycopy(td, 0, td_repaired, 0, initial_window[1] + 1);
         backwardRepairing(p);
         forwardRepairing(p);
+    }
+
+
+    public void testModelOnly(double rate) {
+        call_std();
+
+        ArrayList<ArrayList<Double>> learning_samples = new ArrayList<>();
+        td_anomalies = new boolean[n];
+        this.regression_loss = 0.0;
+        this.td_repaired = new double[n][columnCnt];
+        for (int i = 0; i < td.length; i++) {
+            double[] tuple = td[i];
+            boolean isNormal = checkConsistency(tuple);
+            td_anomalies[i] = !isNormal;
+        }
+        int train_window = (int) (n * rate);
+        for (int i = 0; i < train_window; i++) {
+            ArrayList<Double> sample = new ArrayList<>();
+            for (double value : td[i]) {
+                sample.add(value);
+            }
+            learning_samples.add(sample);
+        }
+        this.prediction_model = new VARUtil(columnCnt);
+        this.prediction_model.fit(learning_samples);
+
+        for (int i = train_window; i < td.length; i++) {
+            double[][] W = getWindow(td, i, p);
+            ArrayList<Double> prediction = this.prediction_model.predict(W);
+//            System.out.println(Arrays.toString(arrayToList(prediction)));
+//            System.out.println(Arrays.toString(td[i]));
+            this.regression_loss += delta(arrayToList(prediction), td[i]);
+        }
+
+        findInitialWindow(p);
+
+        int i = initial_window[1] + 1;
+
+        while (i < n) {
+            if (td_anomalies[i] == Boolean.TRUE) {
+                double[][] W_repaired = getWindow(this.td_repaired, i, p);
+                double[] x_repaired_predicted = arrayToList(prediction_model.predict(W_repaired));
+                this.td_repaired[i] = x_repaired_predicted;
+            } else {
+                this.td_repaired[i] = td[i];
+            }
+            i++;
+        }
     }
 
     public double[] arrayToList(ArrayList<Double> arrayList) {
@@ -316,5 +351,9 @@ public class MasterDetector {
 
     public long getCost_time() {
         return cost_time;
+    }
+
+    public double getRegression_loss() {
+        return regression_loss;
     }
 }

@@ -19,5 +19,5 @@ To reproduce the experiments, please run the code in `src/main/java/Experiment.j
 - `varyingModel(5)` gives the results of varying different auto-regression models.
 
 The proposed methods have been deployed and included as a function in an open-source time series database Apache IoTDB, for anomaly detection with data repairing. 
-The introduction document is available in the [system website](https://iotdb.apache.org/UserGuide/Master/Operators-Functions/Anomaly-Detection.html#masterdetect), and the code of our proposal is included in the [GitHub repository](https://github.com/apache/iotdb/tree/research/master-detector) of the system.
+The introduction document is available in the [system website](https://iotdb.apache.org/UserGuide/latest/SQL-Manual/UDF-Libraries_apache.html#masterdetect), and the code of our proposal is included in the [GitHub repository](https://github.com/apache/iotdb/tree/research/master-detector) of the system.
 

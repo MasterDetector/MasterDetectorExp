@@ -158,6 +158,15 @@ public class Experiment {
         return new Analysis(td_time, td_clean, td_repair, td_bool, cost_time, detect_clean, detect_repair);
     }
 
+    public static Analysis mtcscRepair(long[] td_time, double[][] td_clean, double[][] td_dirty, boolean[] td_bool, boolean[] detect_clean, double S, int T, int dim) throws Exception {
+        System.out.println("\nMTCSC");
+        MTCSC mtcsc = new MTCSC(td_time, td_dirty, td_clean, S, T, dim);
+        double[][] td_repair = mtcsc.getTd_repair();
+        long cost_time = mtcsc.getCost_time();
+        boolean[] detect_repair = AnomalyDetector.detect(td_repair, p, beta);
+        return new Analysis(td_time, td_clean, td_repair, td_bool, cost_time, detect_clean, detect_repair);
+    }
+
     public static void recordFile(String string, String type) throws Exception {
         FileWriter fileWritter = new FileWriter("./results/exp" + type + ".txt", true);
         BufferedWriter bw = new BufferedWriter(fileWritter);
